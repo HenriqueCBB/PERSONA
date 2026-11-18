@@ -1,0 +1,29 @@
+# CI-01 (CODEX-20261118). Roda em pull_request e push nos ramos de trabalho.
+# Sem segredos, sem escrita: permissions somente leitura; actions fixadas por SHA de commit.
+name: ci
+on:
+  pull_request:
+  push:
+    branches: ["claude/**", "codex/**"]
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: CI local (mesmo script usado fora do GitHub)
+        run: bash scripts/ci_local.sh

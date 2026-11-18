@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "persona-taskcard-1",
+  "title": "PERSONA task card (HAND-01, CANDIDATO)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "estado", "utc", "autor_declarado", "base_hash", "evidencia",
+               "proximo_executor", "bloqueio", "lease", "idempotency_key", "historico"],
+  "properties": {
+    "schema_version": {"const": "persona-taskcard-1"},
+    "id": {"type": "string", "pattern": "^[A-Z0-9][A-Z0-9-]{1,40}$"},
+    "estado": {"enum": ["RESERVED", "RUNNING", "EVIDENCE_READY", "AUDITED", "HUMAN_APPROVED", "RELEASED", "BLOCKED", "RELEASED_LEASE"]},
+    "utc": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$"},
+    "autor_declarado": {"type": "string", "minLength": 1, "description": "Declarado, NAO autenticado."},
+    "base_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "evidencia": {"type": "array", "items": {"type": "object", "required": ["ref", "sha256"],
+                  "properties": {"ref": {"type": "string"}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}},
+    "proximo_executor": {"type": ["string", "null"]},
+    "bloqueio": {"type": ["string", "null"]},
+    "lease": {"type": "object", "required": ["dono", "epoch", "expira_utc"],
+              "properties": {"dono": {"type": ["string", "null"]}, "epoch": {"type": "integer", "minimum": 0},
+                             "expira_utc": {"type": ["string", "null"]}}},
+    "idempotency_key": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "historico": {"type": "array", "items": {"type": "object", "required": ["de", "para", "utc", "ator"]}}
+  }
+}

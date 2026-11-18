@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "persona-lab"
+version = "0.1.0"
+description = "PERSONA - codigo de laboratorio (CANDIDATO). Somente dados sinteticos."
+requires-python = ">=3.11"
+dependencies = []  # somente biblioteca padrao: o lock de dependencias de runtime e vazio por desenho
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py311"
