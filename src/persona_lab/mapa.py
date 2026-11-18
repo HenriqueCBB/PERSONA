@@ -350,7 +350,7 @@ def compilar(reg: dict, consumidor: str = "claude", utc: str = "", ids_inline: b
     for n in sorted((n for n in reg["nos"] if n.get("alias")), key=lambda n: n["alias"]):
         if not _visivel(n, teto) and consumidor in ("externo", "gemini"):
             continue
-        did = n.get("drive_id", "-") if consumidor in ("claude", "chatgpt") else "-"
+        did = (n.get("drive_id") or "NAO_RESOLVIDO (não é fonte válida)") if consumidor in ("claude", "chatgpt") else "-"
         m5.append(f"- {n['alias']} = {did} · {n['tipo']} · {n['p0']} · {n['estado']} · {n['titulo']}")
     views = {"M1": "\n".join(m1), "M2": "\n".join(m2), "M3": "\n".join(m3), "M4": "\n".join(m4),
              "M5": "\n".join(m5), "M3_TEMAS": temas}

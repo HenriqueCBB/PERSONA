@@ -88,9 +88,26 @@ INJECAO = [
     ("INJ_PAPEL_FALSO", re.compile(r"(?:^|\n)\s*(?:system|sistema|assistant)\s*:\s*(?:voc[eê]|you)\s", re.IGNORECASE)),
 ]
 
-# Negacao/discussao: texto que FALA de injecao sem ordenar (ex.: aula, politica). So afeta INJ_*.
-_META = re.compile(r"(?:exemplo de|exemplos de|example of|detect\w*|bloque\w*|nunca|never|n[aã]o (?:siga|obede[cç]a)|"
-                   r"o que [eé]|what is|defin\w*|pol[ií]tica)", re.IGNORECASE)
+# Isencao ESTRITA para texto que fala de injecao sem ordenar (correcao do falso negativo achado pelo ChatGPT em
+# 18/11: uma palavra qualquer nos 60 caracteres anteriores desligava a deteccao). So duas formas isentam:
+# (1) negacao IMEDIATA, colada ao verbo, sem pontuacao no meio ("nunca ignore", "nao envie");
+# (2) trecho ENTRE ASPAS precedido de marcador de discussao ("exemplo de ataque: 'ignore ...'").
+# Na duvida, bloqueia. Nao vale para comentario oculto.
+_NEG_IMEDIATA = re.compile(r"(?:\bnunca|\bn[aã]o|\bjamais|\bnever|\bdo not|\bdon't)\s+$", re.IGNORECASE)
+_MARCADOR = re.compile(r"(?:exemplo|example|ataque|attack|detect\w*|frase|texto|trecho|como|o que [eé]|what is)",
+                       re.IGNORECASE)
+_ASPAS = "\"'“”‘’«»"
+
+
+def _isento(t: str, ini: int, fim: int) -> bool:
+    if _NEG_IMEDIATA.search(t[max(0, ini - 15):ini]):
+        return True
+    antes = t[max(0, ini - 120):ini]
+    pos = max(antes.rfind(q) for q in _ASPAS)
+    if pos < 0 or any(q in antes[pos + 1:] for q in _ASPAS):
+        return False
+    fecha = any(q in t[fim:fim + 120] for q in _ASPAS)
+    return fecha and bool(_MARCADOR.search(antes[max(0, pos - 60):pos]))
 
 
 def _mascara(s: str) -> str:
@@ -116,8 +133,7 @@ def checar(texto, denylist: dict | None = None) -> list[dict]:
                 achados.append({"tipo": tipo, "inicio": m.start(), "mascara": _mascara(m.group(0))})
         for tipo, rx in INJECAO:
             for m in rx.finditer(t):
-                janela = t[max(0, m.start() - 60): m.start()]
-                if tipo != "INJ_COMENTARIO_OCULTO" and _META.search(janela):
+                if tipo != "INJ_COMENTARIO_OCULTO" and _isento(t, m.start(), m.end()):
                     continue
                 achados.append({"tipo": tipo, "inicio": m.start(), "mascara": "***"})
         if denylist:
