@@ -249,6 +249,8 @@ def _linha(n, reg, teto, ids_inline, com_texto=True, com_fontes=False):
         refs = " ".join(_ref(a, reg, ids_inline) for a in list(dict.fromkeys(n.get("aponta", []) + n.get("fontes", []))))
         return f"- {n['id']} [{n['p0']}] {n['titulo']} — conteudo so na fonte {refs}".rstrip()
     corpo = f": {n['texto']}" if com_texto and n.get("texto") else ""
+    if n.get("_vencido"):
+        corpo = " [VENCIDO: revalidar]" + corpo
     marca = {"oficial": "", "candidato": "*", "laboratorio": " (lab)"}.get(n.get("estado"), f" ({n.get('estado')})")
     base = f"- {n['titulo']}{marca}{corpo}"
     refs = [_ref(a, reg, ids_inline) for a in alvos if f"[{a}]" not in base]
@@ -269,6 +271,7 @@ def compilar(reg: dict, consumidor: str = "claude", utc: str = "", ids_inline: b
     nos = [n for n in reg["nos"] if n.get("estado") not in ("superado", "quarentena")]
     if consumidor in ("gemini", "externo"):  # acima da classe: some por completo (nem o titulo sai)
         nos = [n for n in nos if _visivel(n, teto)]
+    nos = [dict(n, _vencido=vencido(n, utc)) for n in nos]
     # proposta vinda de conversa so entra nos mapas depois de aprovada pelo titular (fica no registro + contagem no M1)
     pendentes = [n for n in nos if n.get("aprovado") is False]
     nos = [n for n in nos if n.get("aprovado") is not False]
@@ -351,7 +354,7 @@ def compilar(reg: dict, consumidor: str = "claude", utc: str = "", ids_inline: b
         if not _visivel(n, teto) and consumidor in ("externo", "gemini"):
             continue
         did = (n.get("drive_id") or "NAO_RESOLVIDO (não é fonte válida)") if consumidor in ("claude", "chatgpt") else "-"
-        m5.append(f"- {n['alias']} = {did} · {n['tipo']} · {n['p0']} · {n['estado']} · {n['titulo']}")
+        m5.append(f"- {n['alias']} = {did} · {n['tipo']} · {n['p0']} · {n['estado']} · {n['titulo']}{rotulo_uso(n)}")
     views = {"M1": "\n".join(m1), "M2": "\n".join(m2), "M3": "\n".join(m3), "M4": "\n".join(m4),
              "M5": "\n".join(m5), "M3_TEMAS": temas}
     views["PACOTE"] = "\n\n".join([views["M2"], views["M1"], views["M3"]])
@@ -364,8 +367,33 @@ def compilar(reg: dict, consumidor: str = "claude", utc: str = "", ids_inline: b
     medidas.update({f"M3_TEMA_{s}": contar_tokens(t) for s, t in temas.items()})
     views["meta"] = {"consumidor": consumidor, "tokenizador": TOKENIZADOR, "tokens": medidas,
                      "registro_sha256": sha256_json({"nos": reg["nos"], "arestas": reg.get("arestas", [])}),
-                     "avisos": v["avisos"], "estouros": verificar_tetos(medidas)}
+                     "avisos": v["avisos"] + [f"VENCIDO {n['id']}" for n in nos if n.get("_vencido")], "estouros": verificar_tetos(medidas)}
     return views
+
+
+USO_MINIMO, USO_BAIXO, USO_ALTO = 5, 0.2, 0.6
+
+
+def rendimento(n: dict):
+    """N1 = aproveitamentos / consultas; None enquanto houver menos de USO_MINIMO consultas."""
+    c = n.get("uso_consultas", 0)
+    return None if c < USO_MINIMO else n.get("uso_aproveitamentos", 0) / c
+
+
+def rotulo_uso(n: dict) -> str:
+    r = rendimento(n)
+    if r is None:
+        return ""
+    if r < USO_BAIXO and not n.get("critico"):  # H7: fonte rara de alto impacto nunca e rebaixada
+        return f" · baixo rendimento ({r:.0%}): abrir só se o tema exigir"
+    if r >= USO_ALTO:
+        return f" · alto rendimento ({r:.0%})"
+    return ""
+
+
+def vencido(n: dict, utc: str) -> bool:
+    """TTL: item volatil com valido_ate (AAAA-MM-DD) anterior a data da compilacao."""
+    return bool(n.get("valido_ate") and utc and utc[:10] > n["valido_ate"])
 
 
 def verificar_tetos(medidas: dict, tetos: dict = TETOS) -> list[str]:

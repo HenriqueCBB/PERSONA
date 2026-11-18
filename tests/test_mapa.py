@@ -132,6 +132,26 @@ class TestCompilacao(unittest.TestCase):
         self.assertIn("T-S1-A ↔ S6-SIN", v["M4"])  # ponte explícita
         self.assertIn("SEMFONTE", v["M1"])
 
+    def test_rendimento_n1_e_trava_h7(self):
+        r = registro()
+        f = r["nos"][0]
+        f.update(uso_consultas=4, uso_aproveitamentos=0)
+        self.assertNotIn("rendimento", mp.compilar(r, "claude")["M5"])  # menos de 5 consultas: sem rótulo
+        f.update(uso_consultas=10, uso_aproveitamentos=1)
+        self.assertIn("baixo rendimento (10%)", mp.compilar(r, "claude")["M5"])
+        f["critico"] = True
+        self.assertNotIn("baixo rendimento", mp.compilar(r, "claude")["M5"])
+        f.update(critico=False, uso_aproveitamentos=8)
+        self.assertIn("alto rendimento (80%)", mp.compilar(r, "claude")["M5"])
+
+    def test_item_volatil_vencido(self):
+        r = registro()
+        r["nos"][6]["valido_ate"] = "2026-11-20"
+        self.assertNotIn("VENCIDO", mp.compilar(r, "claude", utc="2026-11-19T10:00Z")["M1"])
+        v = mp.compilar(r, "claude", utc="2026-11-25T10:00Z")
+        self.assertIn("[VENCIDO: revalidar]", v["M1"])
+        self.assertIn("VENCIDO ST-V", v["meta"]["avisos"])
+
     def test_cobertura(self):
         v = mp.compilar(registro(), "claude")
         c = mp.cobertura(v["PACOTE"], ["/resumo", "gatilho inexistente"])

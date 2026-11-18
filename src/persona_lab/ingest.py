@@ -207,7 +207,12 @@ def mapa_conversa(capsula: dict, msgs: list[dict]) -> dict:
             no["motivo_quarentena"] = sorted(injecao_fonte | {a for a in achados if a.startswith("INJ_")})
             quarentena.append(no["id"])
         nos.append(no)
-    return {"conversa": info["conversa"], "fonte": fonte, "nos": nos, "quarentena": quarentena,
+    # N1 (taxa de uso util): o que foi aberto na sessao e o que de fato sustentou a resposta (com ponteiro)
+    consultados = sorted(set(capsula.get("consultados", [])))
+    aproveitados = sorted({a["alias"] for a in capsula.get("aproveitados", [])
+                           if isinstance(a, dict) and a.get("msg") in por_id and a.get("alias") in consultados})
+    uso = {a: {"consultas": 1, "aproveitamentos": int(a in aproveitados)} for a in consultados}
+    return {"conversa": info["conversa"], "fonte": fonte, "nos": nos, "quarentena": quarentena, "uso": uso,
             "rejeitados": rejeitados, "tarefas": capsula.get("tarefas", []), "pendencias": capsula.get("pendencias", [])}
 
 
@@ -252,6 +257,14 @@ def aplicar_candidatos(registro: dict, mapa: dict, delta: dict) -> dict:
     ids = {n["id"] for n in novo["nos"]}
     if mapa["fonte"]["id"] not in ids:
         novo["nos"].append(mapa["fonte"])
+    por_alias = {n.get("alias"): n for n in novo["nos"] if n.get("alias")}
+    for a, u in mapa.get("uso", {}).items():  # acumula uso por fonte; uma vez por conversa (idempotente)
+        n = por_alias.get(a)
+        if n is None or mapa["conversa"] in n.get("uso_conversas", []):
+            continue
+        n["uso_conversas"] = n.get("uso_conversas", []) + [mapa["conversa"]]
+        n["uso_consultas"] = n.get("uso_consultas", 0) + u["consultas"]
+        n["uso_aproveitamentos"] = n.get("uso_aproveitamentos", 0) + u["aproveitamentos"]
     por_id = {n["id"]: n for n in mapa["nos"]}
     extras = ("msgs", "relacao", "alvo", "circunstancial", "motivo_quarentena", "sanitizado_de")
     for op in delta["operacoes"]:

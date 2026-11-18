@@ -195,6 +195,19 @@ class TestIngest(unittest.TestCase):
         self.assertEqual(inv["chatgpt"]["VERIFIED"], 1)
         self.assertEqual(inv["desconhecida"]["FAILED"], 1)
 
+    def test_uso_util_acumula_uma_vez_por_conversa(self):
+        base = json.loads(json.dumps(BASE))
+        base["nos"].append({"id": "F-X", "tipo": "fonte", "natureza": "referencia", "titulo": "Fonte X", "texto": "",
+                            "p0": "INT", "alias": "FX", "visoes": [], "supernos": [], "lentes": [], "fontes": [],
+                            "aponta": [], "estado": "oficial", "evidencia": "verificada", "vigencia": "ativa"})
+        txt = "<<<CAPSULA " + json.dumps({"formato": "persona-capsula-1", "conversa": CONV, "nos": [],
+                                         "consultados": ["FX"], "aproveitados": [{"alias": "FX", "msg": "m0002"}]}) + " CAPSULA>>>"
+        m = ig.mapa_conversa(ig.extrair_capsula(txt), msgs())
+        novo = ig.aplicar_candidatos(base, m, ig.reconciliar(base, m))
+        novo = ig.aplicar_candidatos(novo, m, ig.reconciliar(novo, m))  # reprocessar não conta de novo
+        fx = next(n for n in novo["nos"] if n.get("alias") == "FX")
+        self.assertEqual((fx["uso_consultas"], fx["uso_aproveitamentos"]), (1, 1))
+
     def test_preferencia_circunstancial_por_padrao(self):
         cap = ig.extrair_capsula(capsula([{"tipo": "preferencia", "titulo": "Prefere X hoje", "msgs": ["m0001"]}]))
         self.assertTrue(ig.mapa_conversa(cap, msgs())["nos"][0]["circunstancial"])
