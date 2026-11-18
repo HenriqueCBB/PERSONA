@@ -105,8 +105,16 @@ def braco_A(caso: dict, **_) -> str:
 
 
 def _vizinho(fr: list[str], sel: set[int]) -> set[int]:
-    # fragmento seguinte quando um fato [..] atravessa a borda do fragmento
-    return sel | {i + 1 for i in sel if i + 1 < len(fr) and "[" in fr[i] and not fr[i].rstrip().endswith(".")}
+    """Fato cortado na borda: inclui o seguinte (fato comeca aqui e nao termina) e o anterior
+    (fragmento traz identificador mas o rotulo [..] do fato ficou no fragmento de tras)."""
+    out = set(sel)
+    for i in sel:
+        if i + 1 < len(fr) and "[" in fr[i] and not fr[i].rstrip().endswith("."):
+            out.add(i + 1)
+        cabeca = fr[i].split("[", 1)[0]
+        if i > 0 and ID_RX.search(cabeca) and "[" in fr[i - 1]:
+            out.add(i - 1)
+    return out
 
 
 def braco_C(caso: dict, n: int = 40, k: int = 2, vizinho: bool = False, **_) -> str:
